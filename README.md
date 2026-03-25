@@ -76,6 +76,11 @@ Key insights captured:
 - [x] **Proposals Board** (ID: 18405368752)
   - Groups: Requested → In Progress (VA Building) → Rep Review → Approved — Ready to Send → Sent to Client → Accepted → Declined
   - Columns: Rep (Owner), Assigned VA, Due Date, Proposal Value, Linked Pipeline Deal, Proposal Link, Date Sent, Notes
+  - **Proposal Status** column added (color_mm1srrt6): Not Started → In Progress → Draft Complete → Rep Review → Approved → Sent to Client → Accepted → Declined
+- [x] **Sales Pipeline** Proposal status column added (color_mm1sk9b9)
+- [x] **Phase 2–4 Automation Setup Guide** — doc created (ID: 39486479)
+  - 18 automations documented across Proposals Board, Agreements Board, PandaDoc, and Phase 5
+  - Step-by-step UI instructions for each recipe
 
 ### Phase 3 — Post-Proposal
 - [ ] Review Call path (→ Calls & Meetings)
@@ -118,6 +123,9 @@ Key insights captured:
 | Proposals Board | 18405368752 |
 | Agreements Board | 18405368877 |
 | Agreement Request Sheet (Form View) | 245725151 |
+| Phase 2–4 Automation Setup Guide (Doc) | 39486479 |
+| Sales Pipeline Proposal Status Column | color_mm1sk9b9 |
+| Proposals Board Proposal Status Column | color_mm1srrt6 |
 | Contacted Group | group_mm1qtgy3 |
 | Replied/Engaged Group | group_mm1qk7aq |
 | Call Booked Group | group_mm1q551y |
