@@ -14,8 +14,8 @@
 | Active Deals | 18405119784 | Live |
 | Calls & Meetings | (linked) | Live |
 | Follow-Ups | (linked) | Live |
-| Proposals Board | — | **Next: Phase 2** |
-| Agreements Board | — | Planned: Phase 4 |
+| Proposals Board | 18405368752 | Live — Phase 2 |
+| Agreements Board | 18405368877 | Live — Phase 4 |
 
 ---
 
@@ -72,19 +72,25 @@ Key insights captured:
 
 ## Roadmap
 
-### Phase 2 — Next Build
-- [ ] **Proposals Board** — Proposal Requested → VA builds → Rep reviews/approves → Sent to client
-  - Columns: Status, Assigned VA, Due Date, Linked Pipeline Deal, Proposal Doc link
-  - Groups: Requested, In Progress, Review, Approved, Sent, Accepted, Declined
+### Phase 2 — Complete
+- [x] **Proposals Board** (ID: 18405368752)
+  - Groups: Requested → In Progress (VA Building) → Rep Review → Approved — Ready to Send → Sent to Client → Accepted → Declined
+  - Columns: Rep (Owner), Assigned VA, Due Date, Proposal Value, Linked Pipeline Deal, Proposal Link, Date Sent, Notes
 
 ### Phase 3 — Post-Proposal
 - [ ] Review Call path (→ Calls & Meetings)
-- [ ] Direct Agreement path
+- [ ] Direct Agreement path (→ Agreements)
 
-### Phase 4 — Agreement & Contract Flow
-- [ ] **Agreement Request Sheet** (monday.com form)
-- [ ] **Agreements Board**
-- [ ] PandaDoc auto-fill from form data
+### Phase 4 — Agreement & Contract Flow — Boards Built
+- [x] **Agreements Board** (ID: 18405368877)
+  - Groups: Agreement Requested → Drafting / In Review → Sent for Signature → Signed — Active → Voided / Declined
+  - Columns: Rep (Owner), Client Name, Client Email, Company Name, Deal Value, Payment Terms (dropdown), Linked Pipeline Deal, Linked Proposal, PandaDoc Link, Date Sent for Signature, Date Signed, Invoice Status, Notes
+- [x] **Agreement Request Sheet** form view (View ID: 245725151) — on Agreements board
+  - ⚠️ Manual step: Open the form view in monday.com to mark required fields and hide internal columns
+  - Required fields: Deal Name, Signer Full Name, Signer Email, Company Name, Deal Value, Payment Terms
+  - Hide from form: PandaDoc Link, Date Sent for Signature, Date Signed, Invoice Status
+  - Set item creation group to: "Agreement Requested"
+- [ ] PandaDoc integration — auto-fill from form data (via Zapier/Make)
 
 ### Phase 5 — Payment & Close
 - [ ] PandaDoc signed → QuickBooks auto-invoice
@@ -103,6 +109,9 @@ Key insights captured:
 | Active Deals Board | 18405119784 |
 | VA New Lead Intake Board | 18405162437 |
 | 2025 Deals Board (source) | 8929621580 |
+| Proposals Board | 18405368752 |
+| Agreements Board | 18405368877 |
+| Agreement Request Sheet (Form View) | 245725151 |
 | Contacted Group | group_mm1qtgy3 |
 | Replied/Engaged Group | group_mm1qk7aq |
 | Call Booked Group | group_mm1q551y |
