@@ -81,16 +81,22 @@ Key insights captured:
 - [ ] Review Call path (→ Calls & Meetings)
 - [ ] Direct Agreement path (→ Agreements)
 
-### Phase 4 — Agreement & Contract Flow — Boards Built
+### Phase 4 — Agreement & Contract Flow — Complete
 - [x] **Agreements Board** (ID: 18405368877)
   - Groups: Agreement Requested → Drafting / In Review → Sent for Signature → Signed — Active → Voided / Declined
-  - Columns: Rep (Owner), Client Name, Client Email, Company Name, Deal Value, Payment Terms (dropdown), Linked Pipeline Deal, Linked Proposal, PandaDoc Link, Date Sent for Signature, Date Signed, Invoice Status, Notes
-- [x] **Agreement Request Sheet** form view (View ID: 245725151) — on Agreements board
-  - ⚠️ Manual step: Open the form view in monday.com to mark required fields and hide internal columns
-  - Required fields: Deal Name, Signer Full Name, Signer Email, Company Name, Deal Value, Payment Terms
-  - Hide from form: PandaDoc Link, Date Sent for Signature, Date Signed, Invoice Status
-  - Set item creation group to: "Agreement Requested"
-- [ ] PandaDoc integration — auto-fill from form data (via Zapier/Make)
+  - Client fields: Company Name, Client First Name, Client Last Name, Client Email, CC Holder Name, CC Holder Email, Term (Months), Agreement Date
+  - Services (checkbox + price each): Strategy Plan, Creative Development, Retainer, Media Spend & Media Management, Outreach, Podcast Outreach Service, Content Marketing, Other Services
+  - **Total Price** (formula — auto-sums all 8 service prices)
+  - Internal tracking: Sales Rep, Lead Source, PandaDoc Link, Date Sent for Signature, Date Signed, Invoice Status, Linked Pipeline Deal, Linked Proposal, Notes
+- [x] **Agreement Request Sheet** form view (View ID: 245725151, Token: 5a0af06b7df2df43dd906bc6bb2f0ed5)
+  - All 19 fields configured, ordered, and required/optional set correctly
+  - Each service checkbox followed immediately by its price field
+  - Items land in "Agreement Requested" group on submit
+  - Internal columns hidden from form
+- [x] **PandaDoc Integration Guide** — doc created (ID: 39486235)
+  - Full field mapping table (all fields → PandaDoc template variables)
+  - Step-by-step setup: install app, build template, configure automation
+  - Two automations documented: create+send on submit, sync status on sign
 
 ### Phase 5 — Payment & Close
 - [ ] PandaDoc signed → QuickBooks auto-invoice
