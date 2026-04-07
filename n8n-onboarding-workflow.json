@@ -1,0 +1,483 @@
+{
+  "name": "DNA — Client Onboarding Automation",
+  "nodes": [
+    {
+      "id": "sticky-setup",
+      "name": "⚙️ SETUP INSTRUCTIONS",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 60],
+      "parameters": {
+        "content": "## Before You Activate This Workflow\n\nSearch each node for `REPLACE_WITH_` and fill in:\n\n1. **REPLACE_WITH_MONDAY_API_KEY** — Admin → API → Personal API Token\n2. **REPLACE_WITH_SLACK_BOT_TOKEN** — Your Slack App → OAuth & Permissions → Bot Token (`xoxb-...`)\n3. **REPLACE_WITH_SLACK_USER_IDS_COMMA_SEPARATED** — Slack member IDs to auto-invite (e.g. `U012AB3CD,U045EF6GH`). Get them from Slack → Profile → More → Copy Member ID\n4. **REPLACE_WITH_GOOGLE_ACCESS_TOKEN** — Use a Google Service Account. See: https://cloud.google.com/iam/docs/service-account-overview\n5. **REPLACE_WITH_CLIENTS_PARENT_FOLDER_ID** — The Google Drive folder ID where client folders should be created (get from Drive URL)\n6. **REPLACE_WITH_SALES_CHANNEL_ID** — Slack channel ID for your Sales team (e.g. `C012AB3CD`)\n7. **REPLACE_WITH_AD_USER_ID** — Slack user ID for the Account Director to notify\n\n## Monday Automation Setup\nIn Monday: Automation Center → Custom Automation → When Invoice Status changes to Done → Send Webhook → paste this n8n webhook URL:\n`https://YOUR-N8N-INSTANCE/webhook/monday-onboarding`",
+        "height": 380,
+        "width": 620,
+        "color": 5
+      }
+    },
+    {
+      "id": "node-1",
+      "name": "Monday Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 480],
+      "parameters": {
+        "path": "monday-onboarding",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "responseData": "noData"
+      }
+    },
+    {
+      "id": "node-2",
+      "name": "Invoice Status = Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 480],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-col",
+              "leftValue": "={{ $json.event.columnId }}",
+              "rightValue": "color_mm1sqher",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-val",
+              "leftValue": "={{ $json.event.value.label.text }}",
+              "rightValue": "Done",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-3",
+      "name": "Get Agreement Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_MONDAY_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "API-Version", "value": "2024-01" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: '{ items(ids: [' + $json.event.itemId + ']) { id name column_values { id value text } } }' }) }}"
+      }
+    },
+    {
+      "id": "node-4",
+      "name": "Process Client Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 420],
+      "parameters": {
+        "jsCode": "// ─── Parse agreement item ────────────────────────────────────────────────\nconst item = $input.first().json.data.items[0];\nif (!item) throw new Error('Monday item not found in response');\n\nconst cols = {};\nfor (const col of item.column_values) {\n  try { cols[col.id] = col.value ? JSON.parse(col.value) : null; }\n  catch(e) { cols[col.id] = col.value; }\n  cols[col.id + '__text'] = col.text;\n}\n\n// ─── Core client info ────────────────────────────────────────────────────\nconst clientName   = item.name;\nconst firstName    = cols['text_mm1sys6v__text'] || '';\nconst lastName     = cols['short_text1oxj0f3m__text'] || '';\nconst clientEmail  = cols['email_mm1st5e9__text'] || '';\nconst dateSigned   = (cols['date_mm1s7q2s'] || {}).date || null;\nconst today        = new Date().toISOString().split('T')[0];\n\n// ─── Map service checkboxes → Client Database dropdown labels ─────────────\nconst svcSet = new Set();\nconst chk = id => cols[id] && cols[id].checked === 'true';\nif (chk('booleankz6r6wfo') || chk('booleaneier0pdj')) svcSet.add('Strategy');\nif (cols['multi_select5y87oaju__text'])                svcSet.add('Creative');\nif (chk('booleantdu79dpj'))                            svcSet.add('Ads');\nif (chk('boolean0n215rqt') || chk('booleanbto2nwfp'))  svcSet.add('LI Outreach');\nif (chk('booleanltdvfg3r'))                            svcSet.add('Content');\nconst services = [...svcSet];\n\n// ─── Slack channel name (lowercase, dashes) ───────────────────────────────\nconst slackChannelName = clientName\n  .toLowerCase()\n  .replace(/[^a-z0-9\\s-]/g, '')\n  .replace(/\\s+/g, '-')\n  .replace(/-+/g, '-')\n  .slice(0, 80);\n\n// ─── Build Monday Client Database mutation ───────────────────────────────\nconst clientDBCols = {\n  status58: { label: 'Onboarding' },\n  date_agreement_signed: { date: today },\n  date4: { date: dateSigned || today }\n};\nif (services.length > 0) clientDBCols.dropdown0 = { labels: services };\n\nconst createClientDBBody = JSON.stringify({\n  query: 'mutation { create_item(' +\n    'board_id: 1050013805, ' +\n    'group_id: \"topics\", ' +\n    'item_name: ' + JSON.stringify(clientName) + ', ' +\n    'column_values: ' + JSON.stringify(JSON.stringify(clientDBCols)) +\n    ') { id } }'\n});\n\n// ─── Build Campaign Calendar duplication mutation ────────────────────────\nconst calendarName = clientName + ' Campaign Calendar';\nconst duplicateCalendarBody = JSON.stringify({\n  query: 'mutation { duplicate_board(' +\n    'board_id: 1769173441, ' +\n    'duplicate_type: duplicate_board_with_pulses, ' +\n    'board_name: ' + JSON.stringify(calendarName) + ', ' +\n    'workspace_id: 5013168' +\n    ') { board { id name } } }'\n});\n\n// ─── Build Slack channel creation body ───────────────────────────────────\nconst slackCreateChannelBody = JSON.stringify({\n  name: slackChannelName,\n  is_private: false\n});\n\n// ─── Output ───────────────────────────────────────────────────────────────\nreturn [{ json: {\n  itemId:               item.id,\n  clientName,\n  firstName,\n  lastName,\n  clientEmail,\n  dateSigned:           dateSigned || today,\n  agreementPaidDate:    today,\n  services,\n  slackChannelName,\n  calendarName,\n  createClientDBBody,\n  duplicateCalendarBody,\n  slackCreateChannelBody\n}}];"
+      }
+    },
+    {
+      "id": "node-5",
+      "name": "Create Client DB Entry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_MONDAY_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "API-Version", "value": "2024-01" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.createClientDBBody }}"
+      }
+    },
+    {
+      "id": "node-6",
+      "name": "Duplicate Campaign Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_MONDAY_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "API-Version", "value": "2024-01" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $node[\"Process Client Data\"].json.duplicateCalendarBody }}"
+      }
+    },
+    {
+      "id": "node-7",
+      "name": "Create Slack Channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/conversations.create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_SLACK_BOT_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $node[\"Process Client Data\"].json.slackCreateChannelBody }}"
+      }
+    },
+    {
+      "id": "node-8",
+      "name": "Invite Team to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/conversations.invite",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_SLACK_BOT_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ channel: $json.channel.id, users: 'REPLACE_WITH_SLACK_USER_IDS_COMMA_SEPARATED' }) }}"
+      }
+    },
+    {
+      "id": "node-9",
+      "name": "Create Drive Root Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_GOOGLE_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: $node[\"Process Client Data\"].json.clientName, mimeType: 'application/vnd.google-apps.folder', parents: ['REPLACE_WITH_CLIENTS_PARENT_FOLDER_ID'] }) }}"
+      }
+    },
+    {
+      "id": "node-10",
+      "name": "Subfolder: Brand Assets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_GOOGLE_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: 'Brand Assets', mimeType: 'application/vnd.google-apps.folder', parents: [$node['Create Drive Root Folder'].json.id] }) }}"
+      }
+    },
+    {
+      "id": "node-11",
+      "name": "Subfolder: Creative",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2440, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_GOOGLE_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: 'Creative', mimeType: 'application/vnd.google-apps.folder', parents: [$node['Create Drive Root Folder'].json.id] }) }}"
+      }
+    },
+    {
+      "id": "node-12",
+      "name": "Subfolder: Ads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2660, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_GOOGLE_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: 'Ads', mimeType: 'application/vnd.google-apps.folder', parents: [$node['Create Drive Root Folder'].json.id] }) }}"
+      }
+    },
+    {
+      "id": "node-13",
+      "name": "Subfolder: Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2880, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_GOOGLE_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: 'Content', mimeType: 'application/vnd.google-apps.folder', parents: [$node['Create Drive Root Folder'].json.id] }) }}"
+      }
+    },
+    {
+      "id": "node-14",
+      "name": "Subfolder: Reports",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3100, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_GOOGLE_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: 'Reports', mimeType: 'application/vnd.google-apps.folder', parents: [$node['Create Drive Root Folder'].json.id] }) }}"
+      }
+    },
+    {
+      "id": "node-15",
+      "name": "Subfolder: Strategy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3320, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_GOOGLE_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: 'Strategy', mimeType: 'application/vnd.google-apps.folder', parents: [$node['Create Drive Root Folder'].json.id] }) }}"
+      }
+    },
+    {
+      "id": "node-16",
+      "name": "Notify Sales",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3540, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_SLACK_BOT_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  channel: 'REPLACE_WITH_SALES_CHANNEL_ID',\n  text: '🎉 New client signed and paid — onboarding started!',\n  blocks: [\n    {\n      type: 'header',\n      text: { type: 'plain_text', text: '🎉 New Client: ' + $node['Process Client Data'].json.clientName }\n    },\n    {\n      type: 'section',\n      fields: [\n        { type: 'mrkdwn', text: '*Contact:*\\n' + $node['Process Client Data'].json.firstName + ' ' + $node['Process Client Data'].json.lastName },\n        { type: 'mrkdwn', text: '*Email:*\\n' + $node['Process Client Data'].json.clientEmail },\n        { type: 'mrkdwn', text: '*Services:*\\n' + ($node['Process Client Data'].json.services.join(', ') || 'See agreement') },\n        { type: 'mrkdwn', text: '*Date Signed:*\\n' + $node['Process Client Data'].json.dateSigned }\n      ]\n    },\n    {\n      type: 'section',\n      text: { type: 'mrkdwn', text: '*Next Step:* Please complete the onboarding form in Monday for this client.' }\n    },\n    {\n      type: 'actions',\n      elements: [\n        {\n          type: 'button',\n          text: { type: 'plain_text', text: 'Open Client Database' },\n          url: 'https://digitalnicheagency-company.monday.com/boards/1050013805'\n        }\n      ]\n    }\n  ]\n}) }}"
+      }
+    },
+    {
+      "id": "node-17",
+      "name": "Notify Account Director",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3760, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_SLACK_BOT_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  channel: 'REPLACE_WITH_AD_USER_ID',\n  text: '📋 New client onboarded — action required',\n  blocks: [\n    {\n      type: 'header',\n      text: { type: 'plain_text', text: '📋 Assign Team: ' + $node['Process Client Data'].json.clientName }\n    },\n    {\n      type: 'section',\n      text: {\n        type: 'mrkdwn',\n        text: 'A new client has signed and paid. Please:\\n• Assign an *Account Manager* in the Client Database\\n• Schedule the *Kick-Off Call*\\n• Review the Campaign Calendar: *' + $node['Process Client Data'].json.calendarName + '*'\n      }\n    },\n    {\n      type: 'actions',\n      elements: [\n        {\n          type: 'button',\n          text: { type: 'plain_text', text: 'Client Database' },\n          url: 'https://digitalnicheagency-company.monday.com/boards/1050013805'\n        }\n      ]\n    }\n  ]\n}) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Monday Webhook": {
+      "main": [
+        [{ "node": "Invoice Status = Done?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Invoice Status = Done?": {
+      "main": [
+        [{ "node": "Get Agreement Details", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Get Agreement Details": {
+      "main": [
+        [{ "node": "Process Client Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Process Client Data": {
+      "main": [
+        [{ "node": "Create Client DB Entry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Client DB Entry": {
+      "main": [
+        [{ "node": "Duplicate Campaign Calendar", "type": "main", "index": 0 }]
+      ]
+    },
+    "Duplicate Campaign Calendar": {
+      "main": [
+        [{ "node": "Create Slack Channel", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Slack Channel": {
+      "main": [
+        [{ "node": "Invite Team to Slack", "type": "main", "index": 0 }]
+      ]
+    },
+    "Invite Team to Slack": {
+      "main": [
+        [{ "node": "Create Drive Root Folder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Drive Root Folder": {
+      "main": [
+        [{ "node": "Subfolder: Brand Assets", "type": "main", "index": 0 }]
+      ]
+    },
+    "Subfolder: Brand Assets": {
+      "main": [
+        [{ "node": "Subfolder: Creative", "type": "main", "index": 0 }]
+      ]
+    },
+    "Subfolder: Creative": {
+      "main": [
+        [{ "node": "Subfolder: Ads", "type": "main", "index": 0 }]
+      ]
+    },
+    "Subfolder: Ads": {
+      "main": [
+        [{ "node": "Subfolder: Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "Subfolder: Content": {
+      "main": [
+        [{ "node": "Subfolder: Reports", "type": "main", "index": 0 }]
+      ]
+    },
+    "Subfolder: Reports": {
+      "main": [
+        [{ "node": "Subfolder: Strategy", "type": "main", "index": 0 }]
+      ]
+    },
+    "Subfolder: Strategy": {
+      "main": [
+        [{ "node": "Notify Sales", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notify Sales": {
+      "main": [
+        [{ "node": "Notify Account Director", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "dna-onboarding-v1"
+  }
+}
