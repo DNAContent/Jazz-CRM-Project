@@ -26,7 +26,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [0, 240],
-      "webhookId": "221d96b2-4768-45af-96cb-43ad54928433"
+      "webhookId": "221d96b2-4768-45af-96cb-43ad54928433",
+      "httpMethod": "GET"
     },
     {
       "parameters": {
@@ -66,7 +67,7 @@
           "conditions": [
             {
               "id": "93e2b4f9-51f4-4e0f-ad4d-62760875640b",
-              "leftValue": "={{ $json.challenge || '' }}",
+              "leftValue": "={{ $json.body.challenge || '' }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -88,7 +89,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ {\"challenge\": $json.challenge} }}",
+        "responseBody": "={{ {\"challenge\": $json.body.challenge} }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
