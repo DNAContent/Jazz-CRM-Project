@@ -16,6 +16,32 @@
     },
     {
       "parameters": {
+        "httpMethod": "GET",
+        "path": "monday-onboarding",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "get-webhook-challenge",
+      "name": "Monday Challenge (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 240],
+      "webhookId": "221d96b2-4768-45af-96cb-43ad54928433"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query.challenge }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [208, 240],
+      "id": "respond-get-challenge",
+      "name": "Respond GET Challenge"
+    },
+    {
+      "parameters": {
         "httpMethod": "POST",
         "path": "monday-onboarding",
         "responseMode": "responseNode",
@@ -502,6 +528,11 @@
     }
   ],
   "connections": {
+    "Monday Challenge (GET)": {
+      "main": [
+        [{ "node": "Respond GET Challenge", "type": "main", "index": 0 }]
+      ]
+    },
     "Monday Webhook": {
       "main": [
         [{ "node": "Challenge Node", "type": "main", "index": 0 }]
